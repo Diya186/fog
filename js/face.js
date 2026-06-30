@@ -1,7 +1,6 @@
 // ============================================================
 //  face.js  —  fogmirror
-//  detects mouth open via MediaPipe FaceLandmarker
-//  mouth open → triggers fog
+//  mouth open → continuous fog while held open
 // ============================================================
 
 import {
@@ -9,26 +8,22 @@ import {
   FilesetResolver,
 } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs';
 
-// mouth inner landmarks (MediaPipe face mesh indices)
-const UPPER_LIP = 13;
-const LOWER_LIP = 14;
-const CHIN      = 152;
-const FOREHEAD  = 10;
-
-const MOUTH_OPEN_RATIO = 0.02;   // mouth height / face height threshold (lowered)
-const MOUTH_COOLDOWN   = 300;    // ms between fog triggers
+const UPPER_LIP      = 13;
+const LOWER_LIP      = 14;
+const CHIN           = 152;
+const FOREHEAD       = 10;
+const MOUTH_OPEN_RATIO = 0.02;   // trigger threshold
+const SPAWN_INTERVAL   = 120;    // ms between smoke spawns while mouth held open
 
 export class FaceTracker {
   constructor() {
-    this.landmarker  = null;
-    this._lastTrigger = 0;
-    this._running    = false;
-    this._mouthWasOpen = false;
+    this.landmarker      = null;
+    this._mouthOpen      = false;
+    this._lastSpawn      = 0;
 
-    // callbacks
-    this.onMouthOpen  = null;  // (intensity: 0–1) => void
-    this.onMouthClose = null;  // () => void
-    this.onReady      = null;  // () => void
+    this.onMouthOpen     = null;   // (intensity) => void  — fires continuously while open
+    this.onMouthClose    = null;
+    this.onReady         = null;
   }
 
   async init() {
@@ -42,19 +37,15 @@ export class FaceTracker {
           'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
         delegate: 'GPU',
       },
-      runningMode:          'VIDEO',
-      numFaces:             1,
+      runningMode:           'VIDEO',
+      numFaces:              1,
       outputFaceBlendshapes: false,
     });
 
-    console.log('[face] landmarker ready');
+    console.log('[face] ready');
     this.onReady?.();
   }
 
-  /**
-   * Call this every animation frame with the video element.
-   * @param {HTMLVideoElement} videoEl
-   */
   detect(videoEl) {
     if (!this.landmarker || videoEl.readyState < 2) return;
 
@@ -64,31 +55,33 @@ export class FaceTracker {
     if (!result.faceLandmarks?.length) return;
 
     const lm         = result.faceLandmarks[0];
-    const upperLip   = lm[UPPER_LIP];
-    const lowerLip   = lm[LOWER_LIP];
-    const chin       = lm[CHIN];
-    const forehead   = lm[FOREHEAD];
-
-    const faceHeight  = Math.abs(chin.y - forehead.y);
-    const mouthHeight = Math.abs(lowerLip.y - upperLip.y);
+    const faceHeight  = Math.abs(lm[CHIN].y - lm[FOREHEAD].y);
+    const mouthHeight = Math.abs(lm[LOWER_LIP].y - lm[UPPER_LIP].y);
     const ratio       = faceHeight > 0 ? mouthHeight / faceHeight : 0;
+    const isOpen      = ratio > MOUTH_OPEN_RATIO;
 
-    const isOpen = ratio > MOUTH_OPEN_RATIO;
+    if (isOpen) {
+      const intensity = Math.min((ratio - MOUTH_OPEN_RATIO) / 0.08, 1);
 
-    if (isOpen && !this._mouthWasOpen) {
-      this._mouthWasOpen = true;
-      if (now - this._lastTrigger > MOUTH_COOLDOWN) {
-        this._lastTrigger = now;
-        const intensity = Math.min((ratio - MOUTH_OPEN_RATIO) / 0.1, 1);
+      if (!this._mouthOpen) {
+        this._mouthOpen = true;
+        // immediate first spawn
         this.onMouthOpen?.(intensity);
+        this._lastSpawn = now;
+      } else {
+        // keep spawning while mouth stays open, throttled by SPAWN_INTERVAL
+        if (now - this._lastSpawn > SPAWN_INTERVAL) {
+          this._lastSpawn = now;
+          this.onMouthOpen?.(intensity);
+        }
       }
-    } else if (!isOpen && this._mouthWasOpen) {
-      this._mouthWasOpen = false;
-      this.onMouthClose?.();
+    } else {
+      if (this._mouthOpen) {
+        this._mouthOpen = false;
+        this.onMouthClose?.();
+      }
     }
   }
 
-  destroy() {
-    this.landmarker?.close();
-  }
+  destroy() { this.landmarker?.close(); }
 }
