@@ -15,8 +15,8 @@ const LOWER_LIP = 14;
 const CHIN      = 152;
 const FOREHEAD  = 10;
 
-const MOUTH_OPEN_RATIO = 0.055;  // mouth height / face height threshold
-const MOUTH_COOLDOWN   = 500;    // ms between fog triggers
+const MOUTH_OPEN_RATIO = 0.02;   // mouth height / face height threshold (lowered)
+const MOUTH_COOLDOWN   = 300;    // ms between fog triggers
 
 export class FaceTracker {
   constructor() {
