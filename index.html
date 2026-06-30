@@ -17,9 +17,13 @@
       <div class="splash-inner">
         <p class="eyebrow">// fogmirror.exe</p>
         <h1>breathe on me</h1>
-        <p class="sub">open your camera. breathe out. write something.</p>
+        <p class="sub">open your mouth to fog the mirror.<br>point your finger to write on it.</p>
         <button id="start-btn">[ initialize ]</button>
-        <p class="hint">say <span class="cmd">"wipe"</span> to fog again &nbsp;·&nbsp; say <span class="cmd">"clear"</span> to erase writing</p>
+        <div class="hints">
+          <span>😮 open mouth → fog</span>
+          <span>☝️ index finger → draw</span>
+          <span>🎙️ say <em>"wipe"</em> or <em>"clear"</em></span>
+        </div>
       </div>
     </div>
 
@@ -36,18 +40,17 @@
 
       <!-- hud overlay -->
       <div id="hud">
-        <span id="status-mic">🎤 listening...</span>
+        <span id="status-mode"></span>
         <span id="status-voice"></span>
-        <span id="breath-meter"><span id="breath-bar"></span></span>
       </div>
 
       <!-- toolbar -->
       <div id="toolbar">
-        <button class="tool-btn" id="btn-wipe" title="fog it up">🌫️ wipe</button>
-        <button class="tool-btn" id="btn-clear" title="clear drawing">✏️ clear</button>
+        <button class="tool-btn" id="btn-wipe">🌫️ wipe</button>
+        <button class="tool-btn" id="btn-clear">✏️ clear</button>
         <input type="color" id="pen-color" value="#ffffff" title="pen color" />
-        <input type="range" id="pen-size" min="2" max="30" value="6" title="pen size" />
-        <button class="tool-btn" id="btn-save" title="save as image">📷 save</button>
+        <input type="range" id="pen-size" min="2" max="30" value="8" title="pen size" />
+        <button class="tool-btn" id="btn-save">📷 save</button>
       </div>
 
     </div>

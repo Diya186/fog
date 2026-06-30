@@ -1,106 +1,120 @@
 // ============================================================
 //  main.js  —  fogmirror
-//  entry point: wires camera + audio + particles + draw + voice
+//  entry point: camera + face (mouth→fog) + gesture (finger→draw)
 // ============================================================
 
-import { initCamera }    from './camera.js';
-import { AudioAnalyser } from './audio.js';
-import { FogSystem }     from './particles.js';
-import { DrawLayer }     from './draw.js';
-import { VoiceCommands } from './voice.js';
+import { initCamera }     from './camera.js';
+import { FaceTracker }    from './face.js';
+import { GestureTracker } from './gesture.js';
+import { FogSystem }      from './particles.js';
+import { VoiceCommands }  from './voice.js';
 
 // ── element refs ──────────────────────────────────────────
 
-const splash    = document.getElementById('splash');
-const stage     = document.getElementById('stage');
-const startBtn  = document.getElementById('start-btn');
-const videoEl   = document.getElementById('mirror-video');
-const fogCanvas = document.getElementById('fog-canvas');
-const drawCanvas= document.getElementById('draw-canvas');
-const breathBar = document.getElementById('breath-bar');
+const splash     = document.getElementById('splash');
+const stage      = document.getElementById('stage');
+const startBtn   = document.getElementById('start-btn');
+const videoEl    = document.getElementById('mirror-video');
+const fogCanvas  = document.getElementById('fog-canvas');
+const drawCanvas = document.getElementById('draw-canvas');
+const statusEl   = document.getElementById('status-mode');
 const statusVoice= document.getElementById('status-voice');
-const btnWipe   = document.getElementById('btn-wipe');
-const btnClear  = document.getElementById('btn-clear');
-const btnSave   = document.getElementById('btn-save');
-const penColor  = document.getElementById('pen-color');
-const penSize   = document.getElementById('pen-size');
+const btnWipe    = document.getElementById('btn-wipe');
+const btnClear   = document.getElementById('btn-clear');
+const btnSave    = document.getElementById('btn-save');
+const penColor   = document.getElementById('pen-color');
+const penSize    = document.getElementById('pen-size');
 
 // ── modules ───────────────────────────────────────────────
 
-const audio  = new AudioAnalyser();
-const fog    = new FogSystem(fogCanvas);
-const draw   = new DrawLayer(drawCanvas);
+const fog     = new FogSystem(fogCanvas);
+const face    = new FaceTracker();
+const gesture = new GestureTracker(drawCanvas);
 
-const voice  = new VoiceCommands({
+const voice   = new VoiceCommands({
   onWipe:   () => doWipe(),
-  onClear:  () => draw.clear(),
+  onClear:  () => gesture.clear(),
   onStatus: (msg) => showVoiceStatus(msg),
 });
 
 // ── actions ───────────────────────────────────────────────
 
 function doWipe() {
-  draw.clear();
+  gesture.clear();
   fog.wipe();
 }
 
 function showVoiceStatus(msg) {
   statusVoice.textContent = msg;
   statusVoice.classList.remove('voice-active');
-  void statusVoice.offsetWidth; // force reflow to restart animation
+  void statusVoice.offsetWidth;
   if (msg) statusVoice.classList.add('voice-active');
 }
 
-// ── audio callbacks ───────────────────────────────────────
+// ── face callbacks ─────────────────────────────────────────
 
-audio.onVolume = (level) => {
-  // level 0–1, update breath meter bar
-  breathBar.style.width = Math.min(level * 5 * 100, 100) + '%';
-};
-
-audio.onBreath = (intensity) => {
-  console.log(`[main] breath detected, intensity=${intensity.toFixed(2)}`);
+face.onMouthOpen = (intensity) => {
   fog.breathe(intensity);
+  setStatus('😮 fogging...');
 };
 
-// ── toolbar ───────────────────────────────────────────────
+face.onMouthClose = () => setStatus('');
+
+// ── gesture callbacks ──────────────────────────────────────
+
+gesture.onDrawState = (isDrawing) => {
+  setStatus(isDrawing ? '☝️ drawing...' : '');
+};
+
+// ── status helper ──────────────────────────────────────────
+
+let _statusTimer = null;
+function setStatus(msg) {
+  statusEl.textContent = msg;
+  clearTimeout(_statusTimer);
+  if (msg) _statusTimer = setTimeout(() => (statusEl.textContent = ''), 2500);
+}
+
+// ── toolbar ────────────────────────────────────────────────
 
 btnWipe.addEventListener('click',  () => doWipe());
-btnClear.addEventListener('click', () => draw.clear());
-btnSave.addEventListener('click',  () => draw.saveSnapshot(videoEl, fogCanvas));
+btnClear.addEventListener('click', () => gesture.clear());
+btnSave.addEventListener('click',  () => gesture.saveSnapshot(videoEl, fogCanvas));
+penColor.addEventListener('input', (e) => gesture.setColor(e.target.value));
+penSize.addEventListener('input',  (e) => gesture.setSize(e.target.value));
 
-penColor.addEventListener('input', (e) => draw.setColor(e.target.value));
-penSize.addEventListener('input',  (e) => draw.setSize(e.target.value));
+// ── detection loop ─────────────────────────────────────────
 
-// ── startup ───────────────────────────────────────────────
+function detectionLoop() {
+  face.detect(videoEl);
+  gesture.detect(videoEl);
+  requestAnimationFrame(detectionLoop);
+}
+
+// ── startup ────────────────────────────────────────────────
 
 startBtn.addEventListener('click', async () => {
-  startBtn.textContent = '[ starting... ]';
+  startBtn.textContent = '[ loading mediapipe... ]';
   startBtn.disabled    = true;
 
   try {
-    // camera
     await initCamera(videoEl);
 
-    // mic + breath detection
-    await audio.init();
+    startBtn.textContent = '[ loading models... ]';
+    await Promise.all([face.init(), gesture.init()]);
 
-    // voice commands (best-effort, no-throw)
     voice.init();
-
-    // particle loop
     fog.start();
 
-    // show the stage
     splash.classList.add('hidden');
     stage.classList.remove('hidden');
 
-    // initial fog burst so the screen isn't empty
     setTimeout(() => fog.wipe(), 200);
+    detectionLoop();
 
   } catch (err) {
     console.error('[main] startup error:', err);
-    startBtn.textContent = '[ permission denied — try again ]';
+    startBtn.textContent = '[ failed — check console ]';
     startBtn.disabled    = false;
   }
 });
