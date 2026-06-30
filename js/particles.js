@@ -11,9 +11,8 @@ class Particle {
     this.vy    = -(0.04 + Math.random() * 0.18);
     this.r     = 100 + Math.random() * 180;
     this.maxR  = this.r * (1.5 + intensity * 0.5);
-    this.alpha = 0.06 + Math.random() * 0.09 * intensity;
-    // much slower decay = fog hangs around longer
-    this.decay = 0.00008 + Math.random() * 0.00012;
+    this.alpha = 0.18 + Math.random() * 0.18 * intensity;
+    this.decay = 0.0003 + Math.random() * 0.0003;
     this.grow  = 0.3 + Math.random() * 0.5;
     const l    = Math.floor(210 + Math.random() * 20);
     this.r0    = l - 8; this.g0 = l; this.b0 = l + 10;
@@ -63,8 +62,9 @@ export class FogSystem {
 
   // called continuously while mouth open — moderate burst each time
   breathe(intensity = 0.5) {
+    if (this.particles.length > 300) return; // cap to avoid killing performance
     const w = this.canvas.width, h = this.canvas.height;
-    const count = Math.floor(25 + intensity * 35);
+    const count = Math.floor(15 + intensity * 20);
     for (let i = 0; i < count; i++) {
       this.particles.push(new Particle(
         Math.random() * w,
@@ -76,12 +76,13 @@ export class FogSystem {
 
   wipe() {
     this.clearMask();
+    this.particles = []; // clear old ones first
     const w = this.canvas.width, h = this.canvas.height;
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < 150; i++) {
       const p = new Particle(Math.random() * w, Math.random() * h, 1.0);
       p.r     = 120 + Math.random() * 200;
-      p.alpha = 0.08 + Math.random() * 0.1;
-      p.decay = 0.00006;
+      p.alpha = 0.2 + Math.random() * 0.15;
+      p.decay = 0.0002;
       this.particles.push(p);
     }
   }
