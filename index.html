@@ -6,29 +6,68 @@
   <title>fogmirror</title>
   <link rel="stylesheet" href="css/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital@0;1&family=Space+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400;1,700&family=Space+Mono:ital@0;1&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="app">
 
     <div id="splash">
+
+      <!-- floating fog orbs (CSS only) -->
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+      <div class="orb orb-4"></div>
+      <div class="orb orb-5"></div>
+
+      <!-- floating particles -->
+      <div class="particles">
+        <span></span><span></span><span></span>
+        <span></span><span></span><span></span>
+        <span></span><span></span><span></span>
+      </div>
+
       <div class="splash-inner">
+
         <p class="eyebrow">// fogmirror.exe</p>
-        <h1>breathe on me</h1>
-        <p class="sub">open your mouth to fog the mirror.<br>point your finger to write on it.</p>
-        <button id="start-btn">[ initialize ]</button>
-        <div class="hints">
-          <span>😮 open mouth → fog</span>
-          <span>☝️ index finger → erase fog</span>
-          <span>🎙️ say <em>"wipe"</em> or <em>"clear"</em></span>
+
+        <div class="title-wrap">
+          <h1 class="title-line">breathe</h1>
+          <h1 class="title-line accent">on me</h1>
         </div>
+
+        <p class="sub">
+          a mirror that remembers your breath<br>
+          <em>and forgets everything else</em>
+        </p>
+
+        <button id="start-btn">
+          <span class="btn-text">[ initialize ]</span>
+          <span class="btn-glow"></span>
+        </button>
+
+        <div class="hints">
+          <div class="hint-pill">
+            <span class="hint-icon">😮</span>
+            <span>open mouth<br><em>fog appears</em></span>
+          </div>
+          <div class="hint-divider">·</div>
+          <div class="hint-pill">
+            <span class="hint-icon">☝️</span>
+            <span>point finger<br><em>write on fog</em></span>
+          </div>
+          <div class="hint-divider">·</div>
+          <div class="hint-pill">
+            <span class="hint-icon">🎙️</span>
+            <span>say "wipe"<br><em>start over</em></span>
+          </div>
+        </div>
+
       </div>
     </div>
 
     <div id="stage" class="hidden">
       <video id="mirror-video" autoplay playsinline muted></video>
-
-      <!-- only one canvas now — fog + erase mask combined -->
       <canvas id="fog-canvas"></canvas>
 
       <div id="hud">
@@ -38,7 +77,7 @@
 
       <div id="toolbar">
         <button class="tool-btn" id="btn-wipe">🌫️ wipe</button>
-        <button class="tool-btn" id="btn-clear">✏️ clear writing</button>
+        <button class="tool-btn" id="btn-clear">✏️ clear</button>
         <input type="range" id="pen-size" min="10" max="60" value="28" title="erase width" />
         <button class="tool-btn" id="btn-save">📷 save</button>
       </div>
