@@ -1,113 +1,105 @@
 // ============================================================
 //  particles.js  —  fogmirror
-//  fog / smoke particle system on a canvas
+//  fog particle system + finger-erase mask
 // ============================================================
 
-/** One fog puff */
 class Particle {
-  /**
-   * @param {number} x  - spawn x
-   * @param {number} w  - canvas width  (for drift bounds)
-   * @param {number} h  - canvas height
-   * @param {number} intensity - 0–1 breath strength
-   */
-  constructor(x, w, h, intensity = 0.5) {
-    this.x     = x + (Math.random() - 0.5) * 80;
-    this.y     = h * (0.5 + Math.random() * 0.5);   // start in lower half
-    this.vx    = (Math.random() - 0.5) * 0.6;
-    this.vy    = -(0.3 + Math.random() * 0.7 * intensity); // drift upward
-    this.r     = 30  + Math.random() * 80 * intensity;
-    this.maxR  = this.r * (1.8 + intensity);
-    this.alpha = 0.25 + Math.random() * 0.25 * intensity;
-    this.decay = 0.0015 + Math.random() * 0.002;
-    this.grow  = 0.25 + Math.random() * 0.4;
-
-    // slight hue shift: cool grey-blue fog
-    const l = Math.floor(195 + Math.random() * 25);
-    this.color = `rgb(${l},${l + 8},${l + 15})`;
+  constructor(x, y, w, h, intensity = 0.5) {
+    this.x     = x + (Math.random() - 0.5) * 120;
+    this.y     = y + (Math.random() - 0.5) * 120;
+    this.vx    = (Math.random() - 0.5) * 0.5;
+    this.vy    = -(0.1 + Math.random() * 0.4 * intensity);
+    this.r     = 60  + Math.random() * 120 * intensity;
+    this.maxR  = this.r * (1.5 + intensity * 0.8);
+    this.alpha = 0.4 + Math.random() * 0.3 * intensity;
+    this.decay = 0.0008 + Math.random() * 0.001;
+    this.grow  = 0.3  + Math.random() * 0.5;
+    const l    = Math.floor(190 + Math.random() * 30);
+    this.r0    = l; this.g0 = l + 6; this.b0 = l + 14;
   }
 
   update() {
-    this.x      += this.vx;
-    this.y      += this.vy;
-    this.r       = Math.min(this.r + this.grow, this.maxR);
-    this.alpha  -= this.decay;
-    // gentle turbulence
-    this.vx     += (Math.random() - 0.5) * 0.04;
-    this.vy     += (Math.random() - 0.5) * 0.02;
+    this.x    += this.vx + (Math.random() - 0.5) * 0.06;
+    this.y    += this.vy + (Math.random() - 0.5) * 0.04;
+    this.r     = Math.min(this.r + this.grow, this.maxR);
+    this.alpha -= this.decay;
   }
 
   get alive() { return this.alpha > 0; }
 
-  /**
-   * @param {CanvasRenderingContext2D} ctx
-   */
   draw(ctx) {
-    const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r);
-    grd.addColorStop(0,   `rgba(${this._rgb()},${(this.alpha * 0.9).toFixed(3)})`);
-    grd.addColorStop(0.4, `rgba(${this._rgb()},${(this.alpha * 0.5).toFixed(3)})`);
-    grd.addColorStop(1,   `rgba(${this._rgb()},0)`);
-
+    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r);
+    g.addColorStop(0,   `rgba(${this.r0},${this.g0},${this.b0},${(this.alpha * 0.95).toFixed(3)})`);
+    g.addColorStop(0.45,`rgba(${this.r0},${this.g0},${this.b0},${(this.alpha * 0.55).toFixed(3)})`);
+    g.addColorStop(1,   `rgba(${this.r0},${this.g0},${this.b0},0)`);
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.fillStyle = grd;
+    ctx.fillStyle = g;
     ctx.fill();
-  }
-
-  _rgb() {
-    // extract r,g,b from stored color string for alpha compositing
-    return this.color.slice(4, -1); // "195,203,215"
   }
 }
 
-/** Manages all particles + canvas rendering */
 export class FogSystem {
-  /**
-   * @param {HTMLCanvasElement} canvas
-   */
   constructor(canvas) {
-    this.canvas   = canvas;
-    this.ctx      = canvas.getContext('2d');
+    this.canvas    = canvas;
+    this.ctx       = canvas.getContext('2d');
     this.particles = [];
     this._running  = false;
+
+    // offscreen mask — finger strokes drawn here
+    // each frame we punch holes in the fog using destination-out
+    this.maskCanvas = document.createElement('canvas');
+    this.maskCtx    = this.maskCanvas.getContext('2d');
+
     this._resize();
     window.addEventListener('resize', () => this._resize());
   }
 
   _resize() {
-    this.canvas.width  = window.innerWidth;
-    this.canvas.height = window.innerHeight;
+    const w = window.innerWidth, h = window.innerHeight;
+    this.canvas.width  = w; this.canvas.height  = h;
+    this.maskCanvas.width = w; this.maskCanvas.height = h;
   }
 
-  /** Spawn a burst of particles from a breath event */
+  /** Mouth open — aggressive full-screen fog burst */
   breathe(intensity = 0.5) {
-    // number of particles scales with intensity + some base
-    const count = Math.floor(12 + intensity * 28);
-    const cx    = this.canvas.width / 2;
-
+    const w = this.canvas.width, h = this.canvas.height;
+    // scatter particles across the ENTIRE screen
+    const count = Math.floor(60 + intensity * 80);
     for (let i = 0; i < count; i++) {
-      // spread across the bottom half, centered around middle
-      const x = cx + (Math.random() - 0.5) * this.canvas.width * 0.7;
-      this.particles.push(new Particle(x, this.canvas.width, this.canvas.height, intensity));
+      const x = Math.random() * w;
+      const y = Math.random() * h;
+      this.particles.push(new Particle(x, y, w, h, 0.7 + intensity * 0.3));
     }
   }
 
-  /** Wipe: flood the canvas with dense fog then let it drift */
+  /** Wipe: instantly flood everything, also clear finger traces */
   wipe() {
-    const count = 120;
+    this.clearMask();
+    const w = this.canvas.width, h = this.canvas.height;
+    const count = 200;
     for (let i = 0; i < count; i++) {
-      const x = Math.random() * this.canvas.width;
-      const p = new Particle(x, this.canvas.width, this.canvas.height, 0.9);
-      p.y = Math.random() * this.canvas.height;  // scatter vertically too
-      p.r = 60 + Math.random() * 120;
-      p.alpha = 0.35 + Math.random() * 0.2;
+      const p = new Particle(
+        Math.random() * w,
+        Math.random() * h,
+        w, h, 1.0
+      );
+      p.r     = 80  + Math.random() * 160;
+      p.alpha = 0.5 + Math.random() * 0.25;
+      p.decay = 0.0004;
       this.particles.push(p);
     }
   }
 
-  /** Clear all particles */
+  /** Clear the finger-erase mask only (fog stays) */
+  clearMask() {
+    this.maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+  }
+
+  /** Clear everything */
   clear() {
     this.particles = [];
+    this.clearMask();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
@@ -122,9 +114,7 @@ export class FogSystem {
   _loop() {
     if (!this._running) return;
 
-    // don't fully clear — let particles blend naturally
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
     this.ctx.globalCompositeOperation = 'source-over';
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
@@ -132,6 +122,13 @@ export class FogSystem {
       p.update();
       p.draw(this.ctx);
       if (!p.alive) this.particles.splice(i, 1);
+    }
+
+    // punch holes where the finger has written
+    if (this.maskCanvas) {
+      this.ctx.globalCompositeOperation = 'destination-out';
+      this.ctx.drawImage(this.maskCanvas, 0, 0);
+      this.ctx.globalCompositeOperation = 'source-over';
     }
 
     requestAnimationFrame(() => this._loop());

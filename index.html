@@ -9,10 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital@0;1&family=Space+Mono&display=swap" rel="stylesheet">
 </head>
 <body>
-
   <div id="app">
 
-    <!-- splash screen -->
     <div id="splash">
       <div class="splash-inner">
         <p class="eyebrow">// fogmirror.exe</p>
@@ -21,42 +19,32 @@
         <button id="start-btn">[ initialize ]</button>
         <div class="hints">
           <span>😮 open mouth → fog</span>
-          <span>☝️ index finger → draw</span>
+          <span>☝️ index finger → erase fog</span>
           <span>🎙️ say <em>"wipe"</em> or <em>"clear"</em></span>
         </div>
       </div>
     </div>
 
-    <!-- mirror stage -->
     <div id="stage" class="hidden">
-
       <video id="mirror-video" autoplay playsinline muted></video>
 
-      <!-- fog particle canvas -->
+      <!-- only one canvas now — fog + erase mask combined -->
       <canvas id="fog-canvas"></canvas>
 
-      <!-- drawing canvas (topmost) -->
-      <canvas id="draw-canvas"></canvas>
-
-      <!-- hud overlay -->
       <div id="hud">
         <span id="status-mode"></span>
         <span id="status-voice"></span>
       </div>
 
-      <!-- toolbar -->
       <div id="toolbar">
         <button class="tool-btn" id="btn-wipe">🌫️ wipe</button>
-        <button class="tool-btn" id="btn-clear">✏️ clear</button>
-        <input type="color" id="pen-color" value="#ffffff" title="pen color" />
-        <input type="range" id="pen-size" min="2" max="30" value="8" title="pen size" />
+        <button class="tool-btn" id="btn-clear">✏️ clear writing</button>
+        <input type="range" id="pen-size" min="10" max="60" value="28" title="erase width" />
         <button class="tool-btn" id="btn-save">📷 save</button>
       </div>
-
     </div>
 
   </div>
-
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

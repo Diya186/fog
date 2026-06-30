@@ -1,6 +1,5 @@
 // ============================================================
 //  main.js  —  fogmirror
-//  entry point: camera + face (mouth→fog) + gesture (finger→draw)
 // ============================================================
 
 import { initCamera }     from './camera.js';
@@ -9,49 +8,30 @@ import { GestureTracker } from './gesture.js';
 import { FogSystem }      from './particles.js';
 import { VoiceCommands }  from './voice.js';
 
-// ── element refs ──────────────────────────────────────────
+const splash      = document.getElementById('splash');
+const stage       = document.getElementById('stage');
+const startBtn    = document.getElementById('start-btn');
+const videoEl     = document.getElementById('mirror-video');
+const fogCanvas   = document.getElementById('fog-canvas');
+const statusEl    = document.getElementById('status-mode');
+const statusVoice = document.getElementById('status-voice');
+const btnWipe     = document.getElementById('btn-wipe');
+const btnClear    = document.getElementById('btn-clear');
+const btnSave     = document.getElementById('btn-save');
+const penSize     = document.getElementById('pen-size');
 
-const splash     = document.getElementById('splash');
-const stage      = document.getElementById('stage');
-const startBtn   = document.getElementById('start-btn');
-const videoEl    = document.getElementById('mirror-video');
-const fogCanvas  = document.getElementById('fog-canvas');
-const drawCanvas = document.getElementById('draw-canvas');
-const statusEl   = document.getElementById('status-mode');
-const statusVoice= document.getElementById('status-voice');
-const btnWipe    = document.getElementById('btn-wipe');
-const btnClear   = document.getElementById('btn-clear');
-const btnSave    = document.getElementById('btn-save');
-const penColor   = document.getElementById('pen-color');
-const penSize    = document.getElementById('pen-size');
-
-// ── modules ───────────────────────────────────────────────
-
+// fog system owns the mask canvas; gesture draws on that mask
 const fog     = new FogSystem(fogCanvas);
 const face    = new FaceTracker();
-const gesture = new GestureTracker(drawCanvas);
+const gesture = new GestureTracker(fog.maskCanvas);  // ← key link
 
 const voice   = new VoiceCommands({
-  onWipe:   () => doWipe(),
-  onClear:  () => gesture.clear(),
+  onWipe:   () => fog.wipe(),
+  onClear:  () => fog.clearMask(),
   onStatus: (msg) => showVoiceStatus(msg),
 });
 
-// ── actions ───────────────────────────────────────────────
-
-function doWipe() {
-  gesture.clear();
-  fog.wipe();
-}
-
-function showVoiceStatus(msg) {
-  statusVoice.textContent = msg;
-  statusVoice.classList.remove('voice-active');
-  void statusVoice.offsetWidth;
-  if (msg) statusVoice.classList.add('voice-active');
-}
-
-// ── face callbacks ─────────────────────────────────────────
+// ── callbacks ──────────────────────────────────────────────
 
 face.onMouthOpen = (intensity) => {
   fog.breathe(intensity);
@@ -60,28 +40,32 @@ face.onMouthOpen = (intensity) => {
 
 face.onMouthClose = () => setStatus('');
 
-// ── gesture callbacks ──────────────────────────────────────
-
 gesture.onDrawState = (isDrawing) => {
-  setStatus(isDrawing ? '☝️ drawing...' : '');
+  setStatus(isDrawing ? '☝️ writing...' : '');
 };
-
-// ── status helper ──────────────────────────────────────────
-
-let _statusTimer = null;
-function setStatus(msg) {
-  statusEl.textContent = msg;
-  clearTimeout(_statusTimer);
-  if (msg) _statusTimer = setTimeout(() => (statusEl.textContent = ''), 2500);
-}
 
 // ── toolbar ────────────────────────────────────────────────
 
-btnWipe.addEventListener('click',  () => doWipe());
-btnClear.addEventListener('click', () => gesture.clear());
+btnWipe.addEventListener('click',  () => fog.wipe());
+btnClear.addEventListener('click', () => fog.clearMask());
 btnSave.addEventListener('click',  () => gesture.saveSnapshot(videoEl, fogCanvas));
-penColor.addEventListener('input', (e) => gesture.setColor(e.target.value));
 penSize.addEventListener('input',  (e) => gesture.setSize(e.target.value));
+
+// ── status ─────────────────────────────────────────────────
+
+function showVoiceStatus(msg) {
+  statusVoice.textContent = msg;
+  statusVoice.classList.remove('voice-active');
+  void statusVoice.offsetWidth;
+  if (msg) statusVoice.classList.add('voice-active');
+}
+
+let _t = null;
+function setStatus(msg) {
+  statusEl.textContent = msg;
+  clearTimeout(_t);
+  if (msg) _t = setTimeout(() => (statusEl.textContent = ''), 2500);
+}
 
 // ── detection loop ─────────────────────────────────────────
 
@@ -99,7 +83,6 @@ startBtn.addEventListener('click', async () => {
 
   try {
     await initCamera(videoEl);
-
     startBtn.textContent = '[ loading models... ]';
     await Promise.all([face.init(), gesture.init()]);
 
